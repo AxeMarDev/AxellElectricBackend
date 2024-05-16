@@ -86,8 +86,8 @@ func postProject(c *gin.Context) {
 	c.JSON(http.StatusCreated, newProject)
 }
 
-func getPeople(c *gin.Context) {
-	rows, err := db.Query("SELECT id, name, location, imageurl FROM projects")
+func getProjects(c *gin.Context) {
+	rows, err := db.Query("SELECT id, name, location, imageurl FROM projects ORDER BY id ASC")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to query people"})
 		return
@@ -197,7 +197,7 @@ func updateProject(c *gin.Context) {
 
 	// Bind the received JSON to newPerson
 	if err := c.ShouldBindJSON(&updatedProject); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "error when binding json"})
 		return
 	}
 
@@ -245,7 +245,7 @@ func main() {
 	// middleware
 	router.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"*"},
-		AllowMethods:     []string{"GET", "POST", "DELETE", "OPTIONS"},
+		AllowMethods:     []string{"GET", "POST", "DELETE", "OPTIONS", "PATCH"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
@@ -253,7 +253,7 @@ func main() {
 	}))
 
 	// routes for projects
-	router.GET("/projects", getPeople)
+	router.GET("/projects", getProjects)
 	router.POST("/projects", postProject)
 	router.DELETE("/projects", deleteProject)
 	router.PATCH("/projects", updateProject)
