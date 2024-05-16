@@ -23,6 +23,15 @@ type Project struct {
 	Imageurl string `json:"imageurl"`
 }
 
+type Message struct {
+	ID       string `json:"id"`
+	Email    string `json:"email"`
+	Name     string `json:"name"`
+	Location string `json:"location"`
+	Message  string `json:"message"`
+	Read     bool   `json:"read"`
+}
+
 var db *sql.DB
 
 func initDB() {
@@ -135,6 +144,53 @@ func deleteProject(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Person deleted successfully"})
 }
 
+func getMessages(c *gin.Context) {
+	rows, err := db.Query("SELECT id, email, name, location, message, read FROM messages")
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to query messages"})
+		return
+	}
+	defer rows.Close()
+
+	var messages []Message
+	for rows.Next() {
+		var p Message
+		if err := rows.Scan(&p.ID, &p.Email, &p.Name, &p.Location, &p.Message, &p.Read); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan message"})
+			return
+		}
+		messages = append(messages, p)
+	}
+	fmt.Println(messages)
+
+	c.IndentedJSON(http.StatusOK, messages)
+}
+
+func addMessage(c *gin.Context) {
+	var newMessage Message
+
+	// Bind the received JSON to newPerson
+	if err := c.ShouldBindJSON(&newMessage); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Insert newPerson into the database
+	query := `INSERT INTO messages (email, name, location, message, read) VALUES ($1, $2, $3, $4, $5) RETURNING id`
+	var id int
+	err := db.QueryRow(query, newMessage.Email, newMessage.Name, newMessage.Location, newMessage.Message, newMessage.Read).Scan(&id)
+
+	if err != nil {
+		log.Printf("Error while inserting new message: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add new message"})
+		return
+	}
+
+	// Return the new person as JSON
+	c.JSON(http.StatusCreated, newMessage)
+}
+
 func main() {
 
 	initDB()
@@ -152,9 +208,14 @@ func main() {
 		MaxAge:           12 * time.Hour,
 	}))
 
+	// routes for projects
 	router.GET("/projects", getPeople)
 	router.POST("/projects", postProject)
 	router.DELETE("/projects", deleteProject)
+	// routes for messages
+	router.GET("/messages", getMessages)
+	router.POST("/messages", addMessage)
+
 	err := router.Run("localhost:8080")
 
 	if err != nil {
