@@ -191,6 +191,50 @@ func addMessage(c *gin.Context) {
 	c.JSON(http.StatusCreated, newMessage)
 }
 
+func updateProject(c *gin.Context) {
+
+	var updatedProject Project
+
+	// Bind the received JSON to newPerson
+	if err := c.ShouldBindJSON(&updatedProject); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Get the id from the URL parameter
+	id := c.Query("id") // This method is used for query parameters
+	fmt.Println(id)
+
+	if id == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing ID in the URL parameter"})
+		return
+	}
+
+	query := `UPDATE projects SET name = $2, location = $3, data = $4, imageurl = $5 WHERE id = $1`
+	result, err := db.Exec(query, updatedProject.ID, updatedProject.Name, updatedProject.Location, updatedProject.Data, updatedProject.Imageurl)
+
+	if err != nil {
+		log.Printf("Error while deleting person: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update project"})
+		return
+	}
+
+	// Check how many rows were affected
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		log.Printf("Error getting rows affected: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error checking deletion result"})
+		return
+	}
+
+	if rowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "No project found with the provided ID"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Project updated successfully"})
+}
+
 func main() {
 
 	initDB()
@@ -212,6 +256,7 @@ func main() {
 	router.GET("/projects", getPeople)
 	router.POST("/projects", postProject)
 	router.DELETE("/projects", deleteProject)
+	router.PATCH("/projects", updateProject)
 	// routes for messages
 	router.GET("/messages", getMessages)
 	router.POST("/messages", addMessage)
