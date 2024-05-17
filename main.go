@@ -145,7 +145,7 @@ func deleteProject(c *gin.Context) {
 }
 
 func getMessages(c *gin.Context) {
-	rows, err := db.Query("SELECT id, email, name, location, message, read FROM messages")
+	rows, err := db.Query("SELECT id, email, name, location, message, read FROM messages ORDER BY id ASC")
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to query messages"})
@@ -235,6 +235,41 @@ func updateProject(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Project updated successfully"})
 }
 
+func updateMessage(c *gin.Context) {
+	var updatedMessage Message
+
+	// Bind the received JSON to newPerson
+	if err := c.ShouldBindJSON(&updatedMessage); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "error when binding json"})
+		return
+	}
+
+	query := `UPDATE messages SET email = $2, name = $3, location = $4, message = $5, read = $6 WHERE id = $1`
+	result, err := db.Exec(query, updatedMessage.ID, updatedMessage.Email, updatedMessage.Name, updatedMessage.Location, updatedMessage.Message, updatedMessage.Read)
+
+	if err != nil {
+		log.Printf("Error while deleting person: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update message"})
+		return
+	}
+
+	// Check how many rows were affected
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		log.Printf("Error getting rows affected: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error checking deletion result"})
+		return
+	}
+
+	if rowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "No project found with the provided ID"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Message updated successfully"})
+
+}
+
 func main() {
 
 	initDB()
@@ -260,6 +295,7 @@ func main() {
 	// routes for messages
 	router.GET("/messages", getMessages)
 	router.POST("/messages", addMessage)
+	router.PATCH("/messages", updateMessage)
 
 	err := router.Run("localhost:8080")
 
