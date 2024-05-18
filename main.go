@@ -32,6 +32,20 @@ type Message struct {
 	Read     bool   `json:"read"`
 }
 
+type Employee struct {
+	ID        string `json:"id"`
+	CompanyId string `json:"company_id"`
+	Firstname string `json:"first_name"`
+	Lastname  string `json:"last_name"`
+	Email     string `json:"email"`
+	Ismaster  bool   `json:"is_master"`
+}
+
+type Company struct {
+	ID          string `json:"id"`
+	Companyname string `json:"company_name"`
+}
+
 var db *sql.DB
 
 func initDB() {
@@ -270,6 +284,76 @@ func updateMessage(c *gin.Context) {
 
 }
 
+func getCompanies(c *gin.Context) {
+	rows, err := db.Query("SELECT id, company_name read FROM companies ORDER BY id ASC")
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to query companies"})
+		return
+	}
+	defer rows.Close()
+
+	var companies []Company
+	for rows.Next() {
+		var p Company
+		if err := rows.Scan(&p.ID, &p.Companyname); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan message"})
+			return
+		}
+		companies = append(companies, p)
+	}
+	fmt.Println(companies)
+
+	c.IndentedJSON(http.StatusOK, companies)
+}
+
+func addCompany(c *gin.Context) {
+	var newCompany Company
+
+	// Bind the received JSON to newPerson
+	if err := c.ShouldBindJSON(&newCompany); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Insert newPerson into the database
+	query := `INSERT INTO companies (company_name) VALUES ($1) RETURNING id`
+	var id int
+	err := db.QueryRow(query, newCompany.Companyname).Scan(&id)
+
+	if err != nil {
+		log.Printf("Error while inserting new person: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add new company"})
+		return
+	}
+
+	// Return the new person as JSON
+	c.JSON(http.StatusCreated, newCompany)
+}
+
+func getEmployees(c *gin.Context) {
+	rows, err := db.Query("SELECT id, company_id, first_name, last_name, email, is_master read FROM employees ORDER BY id ASC")
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to query employees"})
+		return
+	}
+	defer rows.Close()
+
+	var employees []Employee
+	for rows.Next() {
+		var p Employee
+		if err := rows.Scan(&p.ID, &p.CompanyId, &p.Firstname, &p.Lastname, &p.Email, &p.Ismaster); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan employees"})
+			return
+		}
+		employees = append(employees, p)
+	}
+	fmt.Println(employees)
+
+	c.IndentedJSON(http.StatusOK, employees)
+}
+
 func main() {
 
 	initDB()
@@ -286,6 +370,13 @@ func main() {
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}))
+
+	// company
+	router.GET("/companies", getCompanies)
+	router.POST("/companies", addCompany)
+
+	// employee
+	router.GET("/employees", getEmployees)
 
 	// routes for projects
 	router.GET("/projects", getProjects)
