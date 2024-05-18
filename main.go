@@ -39,6 +39,7 @@ type Employee struct {
 	Lastname  string `json:"last_name"`
 	Email     string `json:"email"`
 	Ismaster  bool   `json:"is_master"`
+	Username  string `json:"username"`
 }
 
 type Company struct {
@@ -307,8 +308,15 @@ func getCompanies(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, companies)
 }
 
+type Mastercompanyemployee struct {
+	ID          string `json:"id"`
+	Companyname string `json:"company_name"`
+	Email       string `json:"email"`
+	Username    string `json:"username"`
+}
+
 func addCompany(c *gin.Context) {
-	var newCompany Company
+	var newCompany Mastercompanyemployee
 
 	// Bind the received JSON to newPerson
 	if err := c.ShouldBindJSON(&newCompany); err != nil {
@@ -322,13 +330,23 @@ func addCompany(c *gin.Context) {
 	err := db.QueryRow(query, newCompany.Companyname).Scan(&id)
 
 	if err != nil {
-		log.Printf("Error while inserting new person: %v", err)
+		log.Printf("Error while inserting new person: %v", err.Error())
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add new company"})
 		return
 	}
 
+	var idNew int
+	queryMasterEmployee := `INSERT INTO employees (company_id, first_name, last_name, email, is_master, username) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`
+	errEmployee := db.QueryRow(queryMasterEmployee, id, "MASTER", "ADMIN", newCompany.Email, true, newCompany.Username).Scan(&idNew)
+
+	if errEmployee != nil {
+		log.Printf("Error while inserting new person: %v", errEmployee.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add master Employee"})
+		return
+	}
+
 	// Return the new person as JSON
-	c.JSON(http.StatusCreated, newCompany)
+	c.JSON(http.StatusCreated, gin.H{"id": id, "company_name": newCompany.Companyname})
 }
 
 func getEmployees(c *gin.Context) {
